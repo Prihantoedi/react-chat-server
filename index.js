@@ -6,6 +6,8 @@ const PORT = 4000;
 const cors = require('cors');
 const { Server } = require('socket.io');
 const mysql = require('mysql');
+// import { v4 as uuidv4} from 'uuid';
+const {v4: uuidv4} = require('uuid');
 
 app.use(cors());
 
@@ -25,7 +27,7 @@ const con = mysql.createConnection({
     host: 'localhost',
     user: 'root', 
     password: '',
-    database: 'node_chat',
+    database: 'realtime_chat',
 });
 
 con.connect(function(err){
@@ -68,12 +70,35 @@ io.on('connection', (socket) => {
         chatRoomUsers = allUsers.filter((user) => user.room === room);
         socket.to(room).emit('chatroom_users', chatRoomUsers);
         socket.emit('chatroom_users', chatRoomUsers);
+
+        socket.on('send_message', (data) => {
+            const { username, room, message, __createdtime__} = data;
+
+            console.log(data);
+            io.in(room).emit('receive_message', data); // send to all users in room ,including sender
+            
+            const idMessage = uuidv4();
+            const sqlInsert = 'INSERT INTO messages(id, message, username, room, created_at) VALUES(?, ?, ?, ?, ?)';
+            con.query(sqlInsert, [idMessage, message, username, room, __createdtime__], (error, results, fields) => {
+                if(error) throw error;
+
+                if(results.protocol41 === true){
+                    console.log(results);
+                } else{
+                    console.log(error);
+                }
+            });
+
+        });
+
     });
 });
 
 
 app.get('/', (req, res) => {
+    const myId = uuidv4();
 
+    console.log(myId);
     res.json({
         message: 'Success',
     });
